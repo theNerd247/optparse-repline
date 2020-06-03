@@ -7,7 +7,7 @@ module Options.Repline where
 
 import Options.Applicative
 import Options.Applicative.Types
-import Control.Arrow
+import Data.List (sortOn)
 import Options.Applicative.Common (mapParser)
 import qualified System.Console.Repline as REPL
 
@@ -15,28 +15,31 @@ type CmdName = String
 type Options a = [(String, Args -> a)]
 
 toRepline :: ParserInfo a -> [(String, Args -> a)]
-toRepline p = sortOn fst $
-  $  (mkToplevelCmdParser p <$> (collectTopLevelCmdNames p))
-  <> ("help", mkHelpParser p)
+toRepline p = 
+      sortOn fst
+  $  ("help", mkHelpParser p)
+  : (mkToplevelCmdParser p <$> (collectTopLevelCmdNames p))
 
 collectTopLevelCmdNames :: ParserInfo a -> [CmdName]
-collectTopLevelCmdNames = undefined
+collectTopLevelCmdNames = mapParser (const optionToCmdName) . infoParser
+
+optionToCmdName :: Option a -> CmdName
+optionToCmdName = undefined
 
 mkToplevelCmdParser :: ParserInfo a -> CmdName -> (CmdName, Args -> a)
 mkToplevelCmdParser pInfo cmdName = 
   ( cmdName
-  , runParser pInfo . prependCmdName cmdName
+  , runParser pInfo . prependCmdName cmdName -- ["foo", "bar"] |-> ["apropos", "foo", "bar"]
   )
 
 mkHelpParser :: ParserInfo a -> Args -> a
-mkHelpArgs pInfo = runParser pInfo . appendHelpFlag
+mkHelpParser pInfo = runParser pInfo . appendHelpFlag
 
 runParser :: ParserInfo a -> Args -> a
 runParser = undefined
 
 prependCmdName :: String -> Args -> Args
 prependCmdName cmdName = ([cmdName] <>)
-
 appendHelpFlag :: Args -> Args
 appendHelpFlag = (<> ["--help"])
 
@@ -104,4 +107,22 @@ appendHelpFlag = (<> ["--help"])
 --
 --   topLevelHelp :: CmdName -> ParserInfo a -> (CmdName, Args -> a)
 --   topLevelHelp cmdName pInfo = (cmdName, parseAll pInfo . mkHelpArgs)
+--
+-- Problem 4:
+-- Consuming left over arguments might not be trivial. E.g:
+--
+--    :apropos foo bar blarg 
+-- Would be parsed by optparse applicative where "foo bar blarg" are considered
+-- command line arguments as apposed to a single string. Repline creates the
+-- args as ["foo", "bar", "blarg"]. We need somehow to convert this into a single
+-- string before passing it to the optparse-applicative parser.
+--
+-- Solution 4:
+--
+--   consumeLine :: Parser String
+--   consumeLine = unwords <$> many strArg (Definitely won't work because of many but, it gets the point across)
+--
+-- This would consume the rest of the list of args and use `unwords` to
+-- recreate a string that allows the user to treat the args as a string
+--
 --  
