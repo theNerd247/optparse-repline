@@ -14,10 +14,10 @@ import qualified System.Console.Repline as REPL
 type CmdName = String
 type Options a = [(String, Args -> a)]
 
--- | A natural transformation for converting optparse-applicative style parsers
--- into the format required by repline.
 toRepline :: ParserInfo a -> [(String, Args -> a)]
-toRepline p = mkToplevelCmdParser p <$> (collectTopLevelCmdNames p)
+toRepline p = sortOn fst $
+  $  (mkToplevelCmdParser p <$> (collectTopLevelCmdNames p))
+  <> ("help", mkHelpParser p)
 
 collectTopLevelCmdNames :: ParserInfo a -> [CmdName]
 collectTopLevelCmdNames = undefined
@@ -27,6 +27,9 @@ mkToplevelCmdParser pInfo cmdName =
   ( cmdName
   , runParser pInfo . prependCmdName cmdName
   )
+
+mkHelpParser :: ParserInfo a -> Args -> a
+mkHelpArgs pInfo = runParser pInfo . appendHelpFlag
 
 runParser :: ParserInfo a -> Args -> a
 runParser = undefined
