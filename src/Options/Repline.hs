@@ -21,10 +21,11 @@ toRepline p =
   : (mkToplevelCmdParser p <$> (collectTopLevelCmdNames p))
 
 collectTopLevelCmdNames :: ParserInfo a -> [CmdName]
-collectTopLevelCmdNames = mapParser (const optionToCmdName) . infoParser
+collectTopLevelCmdNames = mconcat . mapParser (const $ optionToCmdName . optMain) . infoParser
 
-optionToCmdName :: Option a -> CmdName
-optionToCmdName = undefined
+optionToCmdName :: OptReader a -> [CmdName]
+optionToCmdName (CmdReader _ cmds _) = cmds
+optionToCmdName _                    = mempty
 
 mkToplevelCmdParser :: ParserInfo a -> CmdName -> (CmdName, Args -> a)
 mkToplevelCmdParser pInfo cmdName = 
