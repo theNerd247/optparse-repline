@@ -26,10 +26,11 @@ library
     , repline
   hs-source-dirs: src/
 
-test-suite optparse-repline
+test-suite optparse-repline-test
   type: exitcode-stdio-1.0
-  main-is:  test/Main.hs
-  -- other-modules:
+  main-is:  Main.hs
+  other-modules:
+    Arbitrary.Repline
   -- other-extensions:
   build-depends:       
       base
@@ -37,5 +38,7 @@ test-suite optparse-repline
     , QuickCheck
     , tasty
     , tasty-quickcheck
-  -- hs-source-dirs:
+    , optparse-applicative
+    , repline
+  hs-source-dirs: test
   default-language:    Haskell2010

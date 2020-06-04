@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+rm ./tags
+nix-shell -p 'haskellPackages.fast-tags' --run 'fast-tags ./{src,test}/**/*.hs'
