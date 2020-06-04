@@ -14,11 +14,16 @@ import qualified System.Console.Repline as REPL
 type CmdName = String
 type Options a = [(String, Args -> a)]
 
-toRepline :: ParserInfo a -> [(String, Args -> a)]
+data OptParser a = OptParser
+  { prefs :: ParserPrefs
+  , parserInfo :: ParserInfo a
+  } deriving (Functor)
+
+toRepline :: OptParser a -> [(String, Args -> ParserResult a)]
 toRepline p = 
       sortOn fst
   $  ("help", mkHelpParser p)
-  : (mkToplevelCmdParser p <$> (collectTopLevelCmdNames p))
+  : (mkToplevelCmdParser p <$> (collectTopLevelCmdNames . parserInfo $ p))
 
 collectTopLevelCmdNames :: ParserInfo a -> [CmdName]
 collectTopLevelCmdNames = mconcat . mapParser (const $ optionToCmdName . optMain) . infoParser
@@ -27,17 +32,27 @@ optionToCmdName :: OptReader a -> [CmdName]
 optionToCmdName (CmdReader _ cmds _) = cmds
 optionToCmdName _                    = mempty
 
-mkToplevelCmdParser :: ParserInfo a -> CmdName -> (CmdName, Args -> a)
+mkToplevelCmdParser :: OptParser a -> CmdName -> (CmdName, Args -> ParserResult a)
 mkToplevelCmdParser pInfo cmdName = 
   ( cmdName
   , runParser pInfo . prependCmdName cmdName -- ["foo", "bar"] |-> ["apropos", "foo", "bar"]
   )
 
-mkHelpParser :: ParserInfo a -> Args -> a
+mkHelpParser :: OptParser a -> Args -> ParserResult a
 mkHelpParser pInfo = runParser pInfo . appendHelpFlag
 
-runParser :: ParserInfo a -> Args -> a
-runParser = undefined
+runParser :: OptParser a -> Args -> ParserResult a
+runParser OptParser{..} args = execParserPure prefs parserInfo args
+  -- Success a -> Right a 
+  -- Failure parserFailureHelp -> Left parserFailureHelp
+  -- _ -> undefined
+
+commandNameFromArgs :: Args -> CmdName
+commandNameFromArgs []     = ""
+commandNameFromArgs (x:xs) = x
+
+showFailure :: ParserFailure ParserHelp -> String
+showFailure = fst . flip renderFailure "" 
 
 prependCmdName :: String -> Args -> Args
 prependCmdName cmdName = ([cmdName] <>)
