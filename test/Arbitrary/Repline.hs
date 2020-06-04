@@ -11,6 +11,7 @@ import Data.Char (isLetter)
 import Data.Foldable (toList)
 import Data.Functor.Foldable
 import Data.Monoid (Alt(..), Ap(..), First(..))
+import Numeric.Natural
 import Options.Applicative
 import Options.Repline
 import Test.QuickCheck
@@ -24,10 +25,15 @@ type Cmd a = Mod CommandFields a
 
 type PVal a = Either (Cmd a) (Parser a)
 
+
 randParserAlg :: FreeF [] (Cmd a) (PVal a) -> (PVal a)
 randParserAlg (Pure cmd) = Left cmd
 randParserAlg (Free [])  = Right empty
 randParserAlg (Free ps)  = Right . uncurry (<|>) . (subparser *** getAlt) . foldMap (collectMonoid . right Alt) $ ps
+
+randParserCoAlg :: Natural -> Gen (FreeF [] (Cmd CmdName) Natural)
+randParserCoAlg 0 = Pure <$> arbitraryCmd
+randParserCoAlg n = fmap Free $ resize (fromIntegral n) $ listOf $ resize (fromIntegral (n-2)) arbitrarySizedNatural
 
 collectMonoid :: (Monoid a, Monoid b) => Either a b -> (a, b)
 collectMonoid = either ((,mempty)) ((mempty,))
@@ -51,7 +57,7 @@ arbitraryCmdName = resize 7 $ listOf $ arbitrary `suchThat` isLetter
 -- Creates a command parser that always succeeds and returns its name. This is
 -- used to determine if the correct internal parser is called when commandline
 -- args that corresponds to the created parser
-mkCommand :: CmdName -> Mod CommandFields CmdName
+mkCommand :: CmdName -> Cmd CmdName
 mkCommand cmdName = command cmdName $ info (pure $ cmdName) mempty
 
 withSelected :: (Foldable t) => t a -> Gen (t a, Maybe a)
