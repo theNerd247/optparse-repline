@@ -16,8 +16,8 @@ type CmdName = String
 type Options a = [(String, Args -> a)]
 
 data OptParser a = forall b. OptParser
-  { prefs :: ParserPrefs
-  , parserInfo :: ParserInfo b
+  { parserPrefs        :: ParserPrefs
+  , parserInfo         :: ParserInfo b
   , handleParserResult :: ParserResult b -> a
   }
 
@@ -44,7 +44,7 @@ mkHelpParser :: OptParser a -> Args -> a
 mkHelpParser pInfo = runParser pInfo . appendHelpFlag
 
 runParser :: OptParser a -> Args -> a
-runParser OptParser{..} = handleParserResult . execParserPure prefs parserInfo 
+runParser OptParser{..} = handleParserResult . execParserPure parserPrefs parserInfo 
 
 commandNameFromArgs :: Args -> CmdName
 commandNameFromArgs []     = ""
@@ -55,6 +55,7 @@ showFailure = fst . flip renderFailure ""
 
 prependCmdName :: String -> Args -> Args
 prependCmdName cmdName = ([cmdName] <>)
+
 appendHelpFlag :: Args -> Args
 appendHelpFlag = (<> ["--help"])
 
