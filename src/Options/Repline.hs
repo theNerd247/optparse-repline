@@ -35,7 +35,7 @@ optionToCmdName _                    = mempty
 mkToplevelCmdParser :: OptParser a -> CmdName -> (CmdName, Args -> ParserResult a)
 mkToplevelCmdParser pInfo cmdName = 
   ( cmdName
-  , runParser pInfo . prependCmdName cmdName -- ["foo", "bar"] |-> ["apropos", "foo", "bar"]
+  , runParser pInfo . prependCmdName cmdName 
   )
 
 mkHelpParser :: OptParser a -> Args -> ParserResult a
@@ -43,9 +43,6 @@ mkHelpParser pInfo = runParser pInfo . appendHelpFlag
 
 runParser :: OptParser a -> Args -> ParserResult a
 runParser OptParser{..} args = execParserPure prefs parserInfo args
-  -- Success a -> Right a 
-  -- Failure parserFailureHelp -> Left parserFailureHelp
-  -- _ -> undefined
 
 commandNameFromArgs :: Args -> CmdName
 commandNameFromArgs []     = ""
