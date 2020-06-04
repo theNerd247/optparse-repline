@@ -25,10 +25,33 @@ import Options.Applicative
 -- failing a parser
 --    
 
--- TODO: write instance
-instance Arbitrary a => Arbitrary (OptParser a) where
-  arbitrary = (\x -> OptParser
-    { parserPrefs        = defaultPrefs
-    , parserInfo         = 
-    , handleParserResult = const x
-    }) <$> arbitrary
+emptyTestParser :: Gen (OptParser (Maybe ()))
+emptyTestParser = pure $ testParser $ pure ()
+
+singleSubTestParser :: Gen (OptParser (Maybe CmdName))
+singleSubTestParser = testParser . subparser <$> genCommand
+
+multiCmdSubTestParser :: Gen (OptParser (Maybe CmdName))
+multiCmdSubTestParser = testParser . subparser <$> (nMonoids genCommand)
+
+multiSubTestParser :: Gen (OptParser (Maybe CmdName))
+multiSubTestParser = fmap testParser $ resize 10 $ subparser <$> genCommand
+
+testParser :: Parser a ->  OptParser (Maybe a)
+testParser p = OptParser
+  { parserPrefs        = defaultPrefs
+  , parserInfo         = info p mempty
+  , handleParserResult = getParseResult
+  }
+
+nMonoids :: (Monoid m) => Gen m -> Gen m
+nMonoids g = mconcat <$> (listOf g)
+
+genCommand :: Gen (Mod CommandFields CmdName)
+genCommand = mkCommand <$> arbitraryCmdName
+
+arbitraryCmdName :: Gen CmdName
+arbitraryCmdName = resize 7 $ listOf arbitraryASCIIChar
+
+mkCommand :: CmdName -> Mod CommandFields CmdName
+mkCommand cmdName = command cmdName $ info (pure $ cmdName) mempty
