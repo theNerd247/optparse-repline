@@ -5,15 +5,32 @@
 
 module Arbitrary.Repline where
 
+import Control.Arrow (right, (***))
+import Control.Monad.Trans.Free
 import Data.Char (isLetter)
 import Data.Foldable (toList)
+import Data.Functor.Foldable
 import Data.Monoid (Alt(..), Ap(..), First(..))
 import Options.Applicative
 import Options.Repline
 import Test.QuickCheck
 
-subParserTestParser :: [[CmdName]] -> ParserInfo CmdName
-subParserTestParser = emptyParser . getAlt . foldMap (Alt . subparser . foldMap mkCommand)
+-- Rose a = Leaf a | Branch [(Rose a)] 
+-- RoseF e a = Leaf e | Branch [a]
+--
+-- RoseF a = Free []
+
+type Cmd a = Mod CommandFields a
+
+type PVal a = Either (Cmd a) (Parser a)
+
+randParserAlg :: FreeF [] (Cmd a) (PVal a) -> (PVal a)
+randParserAlg (Pure cmd) = Left cmd
+randParserAlg (Free [])  = Right empty
+randParserAlg (Free ps)  = Right . uncurry (<|>) . (subparser *** getAlt) . foldMap (collectMonoid . right Alt) $ ps
+
+collectMonoid :: (Monoid a, Monoid b) => Either a b -> (a, b)
+collectMonoid = either ((,mempty)) ((mempty,))
 
 testOptParser :: ParserInfo a ->  OptParser (Maybe a)
 testOptParser p = OptParser
@@ -25,11 +42,8 @@ testOptParser p = OptParser
 emptyParser :: Parser a -> ParserInfo a
 emptyParser = flip info mempty 
 
-arbitrarySubParserCmdNames :: Gen [[CmdName]]
-arbitrarySubParserCmdNames = resize 10 $ listOf arbitraryCmdNames
-
-arbitraryCmdNames :: Gen [CmdName]
-arbitraryCmdNames = resize 10 $ listOf arbitraryCmdName
+arbitraryCmd :: Gen (Cmd CmdName)
+arbitraryCmd = mkCommand <$> arbitraryCmdName
 
 arbitraryCmdName :: Gen CmdName
 arbitraryCmdName = resize 7 $ listOf $ arbitrary `suchThat` isLetter
