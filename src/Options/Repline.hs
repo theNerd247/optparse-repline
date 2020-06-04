@@ -54,7 +54,7 @@ showFailure :: ParserFailure ParserHelp -> String
 showFailure = fst . flip renderFailure "" 
 
 prependCmdName :: String -> Args -> Args
-prependCmdName cmdName = ([cmdName] <>)
+prependCmdName = (:)
 
 appendHelpFlag :: Args -> Args
 appendHelpFlag = (<> ["--help"])
