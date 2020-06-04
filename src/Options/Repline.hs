@@ -2,6 +2,7 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 module Options.Repline where
 
@@ -14,16 +15,17 @@ import qualified System.Console.Repline as REPL
 type CmdName = String
 type Options a = [(String, Args -> a)]
 
-data OptParser a = OptParser
+data OptParser a = forall b. OptParser
   { prefs :: ParserPrefs
-  , parserInfo :: ParserInfo a
-  } deriving (Functor)
+  , parserInfo :: ParserInfo b
+  , handleParserResult :: ParserResult b -> a
+  }
 
-toRepline :: OptParser a -> [(String, Args -> ParserResult a)]
-toRepline p = 
+toRepline :: OptParser a -> [(String, Args -> a)]
+toRepline p@OptParser{..} = 
       sortOn fst
   $  ("help", mkHelpParser p)
-  : (mkToplevelCmdParser p <$> (collectTopLevelCmdNames . parserInfo $ p))
+  : (mkToplevelCmdParser p <$> (collectTopLevelCmdNames $ parserInfo))
 
 collectTopLevelCmdNames :: ParserInfo a -> [CmdName]
 collectTopLevelCmdNames = mconcat . mapParser (const $ optionToCmdName . optMain) . infoParser
@@ -32,17 +34,17 @@ optionToCmdName :: OptReader a -> [CmdName]
 optionToCmdName (CmdReader _ cmds _) = cmds
 optionToCmdName _                    = mempty
 
-mkToplevelCmdParser :: OptParser a -> CmdName -> (CmdName, Args -> ParserResult a)
+mkToplevelCmdParser :: OptParser a -> CmdName -> (CmdName, Args -> a)
 mkToplevelCmdParser pInfo cmdName = 
   ( cmdName
   , runParser pInfo . prependCmdName cmdName 
   )
 
-mkHelpParser :: OptParser a -> Args -> ParserResult a
+mkHelpParser :: OptParser a -> Args -> a
 mkHelpParser pInfo = runParser pInfo . appendHelpFlag
 
-runParser :: OptParser a -> Args -> ParserResult a
-runParser OptParser{..} args = execParserPure prefs parserInfo args
+runParser :: OptParser a -> Args -> a
+runParser OptParser{..} = handleParserResult . execParserPure prefs parserInfo 
 
 commandNameFromArgs :: Args -> CmdName
 commandNameFromArgs []     = ""
