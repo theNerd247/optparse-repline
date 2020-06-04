@@ -25,14 +25,14 @@ toRepline :: OptParser a -> [(String, Args -> a)]
 toRepline p@OptParser{..} = 
       sortOn fst
   $  ("help", mkHelpParser p)
-  : (mkToplevelCmdParser p <$> (collectTopLevelCmdNames $ parserInfo))
+  : (fmap (mkToplevelCmdParser p) . collectTopLevelCmdNames $ parserInfo)
 
 collectTopLevelCmdNames :: ParserInfo a -> [CmdName]
-collectTopLevelCmdNames = mconcat . mapParser (const $ optionToCmdName . optMain) . infoParser
+collectTopLevelCmdNames = mconcat . mapParser (const $ getTopLevelCmdNames . optMain) . infoParser
 
-optionToCmdName :: OptReader a -> [CmdName]
-optionToCmdName (CmdReader _ cmds _) = cmds
-optionToCmdName _                    = mempty
+getTopLevelCmdNames :: OptReader a -> [CmdName]
+getTopLevelCmdNames (CmdReader _ cmds _) = cmds
+getTopLevelCmdNames _                    = mempty
 
 mkToplevelCmdParser :: OptParser a -> CmdName -> (CmdName, Args -> a)
 mkToplevelCmdParser pInfo cmdName = 
@@ -53,7 +53,7 @@ commandNameFromArgs (x:xs) = x
 showFailure :: ParserFailure ParserHelp -> String
 showFailure = fst . flip renderFailure "" 
 
-prependCmdName :: String -> Args -> Args
+prependCmdName :: CmdName -> Args -> Args
 prependCmdName = (:)
 
 appendHelpFlag :: Args -> Args
