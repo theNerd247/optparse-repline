@@ -25,6 +25,10 @@ type Cmd a = Mod CommandFields a
 
 type PVal a = Either (Cmd a) (Parser a)
 
+instance (Arbitrary1 f) => Arbitrary2 (FreeF f) where
+  liftArbitrary2 genA genB = oneof [Pure <$> genA, Free <$> (liftArbitrary genB)]
+  liftShrink2 shrinkA _ (Pure a)  = Pure <$> (shrinkA a)
+  liftShrink2 _ shrinkB (Free fb) = Free <$> (liftShrink shrinkB fb)
 
 randParserAlg :: FreeF [] (Cmd a) (PVal a) -> (PVal a)
 randParserAlg (Pure cmd) = Left cmd
