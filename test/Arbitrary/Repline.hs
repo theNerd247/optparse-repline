@@ -32,13 +32,10 @@ instance (Arbitrary1 f) => Arbitrary1 (Free f) where
   liftShrink shrinkA (Free fFree) = Free <$> liftShrink (liftShrink shrinkA) fFree
 
 fromParserTree :: (Functor f, Foldable f) => Free f CmdName -> ParserInfo CmdName
-fromParserTree = emptyParser . fromPVal . cata randParserAlg
+fromParserTree = emptyParser . either subparser id . cata randParserAlg
 
 getCmdNames :: (Foldable f) => Free f CmdName -> [CmdName]
 getCmdNames = toList
-
-fromPVal :: PVal a -> Parser a
-fromPVal = either subparser id
 
 randParserAlg :: (Foldable f) => CMTF.FreeF f CmdName (PVal CmdName) -> (PVal CmdName)
 randParserAlg (CMTF.Pure cmd) = Left $ mkCommand cmd
