@@ -6,7 +6,7 @@
 module Arbitrary.Repline where
 
 import Control.Arrow (right, (***))
-import Control.Monad.Trans.Free
+import Control.Monad.Free 
 import Data.Char (isLetter)
 import Data.Foldable (toList)
 import Data.Functor.Foldable
@@ -15,29 +15,31 @@ import Numeric.Natural
 import Options.Applicative
 import Options.Repline
 import Test.QuickCheck
-
--- Rose a = Leaf a | Branch [(Rose a)] 
--- RoseF e a = Leaf e | Branch [a]
---
--- RoseF a = Free []
+import qualified Control.Monad.Trans.Free as CMTF
 
 type Cmd a = Mod CommandFields a
 
 type PVal a = Either (Cmd a) (Parser a)
 
-instance (Arbitrary1 f) => Arbitrary2 (FreeF f) where
-  liftArbitrary2 genA genB = oneof [Pure <$> genA, Free <$> (liftArbitrary genB)]
-  liftShrink2 shrinkA _ (Pure a)  = Pure <$> (shrinkA a)
-  liftShrink2 _ shrinkB (Free fb) = Free <$> (liftShrink shrinkB fb)
+-- ParserTree a = Free [] (Cmd a) = Free [] (Cmd a)
 
-randParserAlg :: FreeF [] (Cmd a) (PVal a) -> (PVal a)
-randParserAlg (Pure cmd) = Left cmd
-randParserAlg (Free [])  = Right empty
-randParserAlg (Free ps)  = Right . uncurry (<|>) . (subparser *** getAlt) . foldMap (collectMonoid . right Alt) $ ps
+instance (Arbitrary1 f) => Arbitrary1 (Free f) where
+  liftArbitrary genA = frequency 
+    [ (3, Pure <$> genA)
+    , (1, Free <$> liftArbitrary (liftArbitrary genA))
+    ]
+  liftShrink shrinkA (Pure a)  = Pure <$> (shrinkA a)
+  liftShrink shrinkA (Free fFree) = Free <$> liftShrink (liftShrink shrinkA) fFree
 
-randParserCoAlg :: Natural -> Gen (FreeF [] (Cmd CmdName) Natural)
-randParserCoAlg 0 = Pure <$> arbitraryCmd
-randParserCoAlg n = fmap Free $ resize (fromIntegral n) $ listOf $ resize (fromIntegral (n-2)) arbitrarySizedNatural
+-- fromParserTree :: (Foldable f) => Free f (Cmd a) -> m (Parser a)
+-- fromParserTree = cata randParserAlg
+
+fromPVal :: PVal a -> Parser a
+fromPVal = either subparser id
+
+randParserAlg :: (Foldable f) => CMTF.FreeF f (Cmd a) (PVal a) -> (PVal a)
+randParserAlg (CMTF.Pure cmd) = Left cmd
+randParserAlg (CMTF.Free ps)  = Right . uncurry (<|>) . (subparser *** getAlt) . foldMap (collectMonoid . right Alt) $ ps
 
 collectMonoid :: (Monoid a, Monoid b) => Either a b -> (a, b)
 collectMonoid = either ((,mempty)) ((mempty,))
