@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+
 module Main where
 
 import Arbitrary.Repline
@@ -26,10 +28,11 @@ collectCmdNamesTest = QC.testProperty "Collected Command Names From Parser" coll
 runParserTest :: TestTree
 runParserTest = QC.testProperty "runParser gives back correct cmd" runParserProp
 
+-- Tests that collecting all the toplevel command names works 
 collectCmdNamesProp :: Property
-collectCmdNamesProp = forAll arbitrarySubParserCmdNames $ \subParsersCmdNames ->
-    let collectedNames = sort $ collectTopLevelCmdNames $ subParserTestParser subParsersCmdNames
-        cmdNames = sort $ mconcat subParsersCmdNames
+collectCmdNamesProp = forAll (liftArbitrary arbitraryCmdName) $ \ptree ->
+    let collectedNames = sort $ collectTopLevelCmdNames $ fromParserTree @ParserTree ptree 
+        cmdNames = sort $ getCmdNames ptree
     in 
       counterexample ("Collected names: " <> (show collectedNames))
     $ collectedNames == cmdNames
@@ -39,14 +42,11 @@ collectCmdNamesProp = forAll arbitrarySubParserCmdNames $ \subParsersCmdNames ->
 -- the optparse-applicative parser will work with the repline parser after we've appended
 -- the command name to the list of arguments.
 runParserProp  :: Property
-runParserProp = forAll (arbitrarySubParserCmdNames >>= withSelected . Compose) $ 
-  \(subParsersCmdNames, selectedCmdName) ->
+runParserProp = forAll (liftArbitrary arbitraryCmdName >>= withSelected) $ \(ptree, selectedCmdName) ->
   let 
     parsedCmd = 
       selectedCmdName 
-      >>= runParser 
-        (testOptParser . subParserTestParser . getCompose $ subParsersCmdNames) 
-        . pure
+      >>= runParser (testOptParser . fromParserTree @ParserTree $ ptree) . pure
   in 
     counterexample ("Parser returned: " <> (show parsedCmd))
   $ parsedCmd == selectedCmdName
