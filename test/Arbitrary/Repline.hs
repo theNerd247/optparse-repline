@@ -3,10 +3,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Arbitrary.Repline where
 
-import Control.Arrow (right, (***))
+import Control.Arrow
 import Control.Monad.Free 
 import Data.Char (isLetter)
 import Data.Foldable (toList)
@@ -20,18 +21,32 @@ import qualified Control.Monad.Trans.Free as CMTF
 
 type Cmd a = Mod CommandFields a
 
--- ParserTree a = Free [] (Cmd a) = Free [] (Cmd a)
+type ParserTree = Free []
+
+instance (Arbitrary a, Arbitrary1 f) => Arbitrary (Free f a) where
+  arbitrary = liftArbitrary arbitrary
+  shrink    = liftShrink shrink
 
 instance (Arbitrary1 f) => Arbitrary1 (Free f) where
-  liftArbitrary genA = frequency 
-    [ (3, Pure <$> genA)
-    , (1, Free <$> liftArbitrary (liftArbitrary genA))
-    ]
-  liftShrink shrinkA (Pure a)  = Pure <$> (shrinkA a)
+  liftArbitrary genA = sized $ \case
+    0 -> Pure <$> genA
+    n -> fmap Free $ liftArbitrary $ choose (0, n-1) >>= flip resize (liftArbitrary genA)
+  liftShrink shrinkA (Pure a)     = Pure <$> (shrinkA a)
   liftShrink shrinkA (Free fFree) = Free <$> liftShrink (liftShrink shrinkA) fFree
 
 fromParserTree :: (Functor f, Foldable f) => Free f CmdName -> ParserInfo CmdName
-fromParserTree = emptyParser . either subparser id . cata randParserAlg
+fromParserTree = fromPTree . cata randParserAlg
+
+fromPTree :: Either (Cmd a) (Parser a) -> ParserInfo a
+fromPTree = emptyParser . either subparser id
+
+fromParserTreeSelName :: (Functor f, Foldable f) => Free f CmdName -> (ParserInfo CmdName, Gen (Maybe CmdName))
+fromParserTreeSelName = 
+  (fromPTree *** getMaybeChooseFirst)
+  . cata (cAlg randParserAlg maybeChooseFirst)
+
+cAlg :: (Functor f) => (f a -> c) -> (f b -> d) -> f (a,b) -> (c,d)
+cAlg algA algB = (algA . fmap fst) &&& (algB . fmap snd)
 
 getCmdNames :: (Foldable f) => Free f CmdName -> [CmdName]
 getCmdNames = toList
@@ -42,11 +57,11 @@ randParserAlg (CMTF.Free ps)  =
     Right 
   . uncurry (<|>) 
   . (subparser *** getAlt) 
-  . foldMap (collectMonoid . right Alt) 
+  . foldMap (eitherMonoid . right Alt) 
   $ ps
 
-collectMonoid :: (Monoid a, Monoid b) => Either a b -> (a, b)
-collectMonoid = either ((,mempty)) ((mempty,))
+eitherMonoid :: (Monoid a, Monoid b) => Either a b -> (a, b)
+eitherMonoid = ((,mempty)) ||| ((mempty,))
 
 testOptParser :: ParserInfo a ->  OptParser (Maybe a)
 testOptParser p = OptParser
@@ -67,8 +82,9 @@ arbitraryCmdName = resize 7 $ listOf $ arbitrary `suchThat` isLetter
 mkCommand :: CmdName -> Cmd CmdName
 mkCommand cmdName = command cmdName $ info (pure $ cmdName) mempty
 
-withSelected :: (Foldable t) => t a -> Gen (t a, Maybe a)
-withSelected t = ((t,)) <$> (maybeChooseFirst t)
+maybeChooseFirst :: (Foldable f, x ~ Ap Gen (First a)) => CMTF.FreeF f a x -> x
+maybeChooseFirst (CMTF.Pure x) = Ap $ elements [First Nothing, First $ Just x]
+maybeChooseFirst (CMTF.Free x) = foldMap id x
 
-maybeChooseFirst :: (Foldable t) => t a -> Gen (Maybe a)
-maybeChooseFirst = fmap getFirst . getAp . foldMap (\x -> Ap $ First <$> elements [Nothing, Just x])
+getMaybeChooseFirst :: Ap Gen (First a) -> Gen (Maybe a)
+getMaybeChooseFirst = fmap getFirst . getAp
