@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Arbitrary.Repline where
 
@@ -19,8 +20,6 @@ import qualified Control.Monad.Trans.Free as CMTF
 
 type Cmd a = Mod CommandFields a
 
-type PVal a = Either (Cmd a) (Parser a)
-
 -- ParserTree a = Free [] (Cmd a) = Free [] (Cmd a)
 
 instance (Arbitrary1 f) => Arbitrary1 (Free f) where
@@ -37,7 +36,7 @@ fromParserTree = emptyParser . either subparser id . cata randParserAlg
 getCmdNames :: (Foldable f) => Free f CmdName -> [CmdName]
 getCmdNames = toList
 
-randParserAlg :: (Foldable f) => CMTF.FreeF f CmdName (PVal CmdName) -> (PVal CmdName)
+randParserAlg :: (x ~ Either (Cmd CmdName) (Parser CmdName), Foldable f) => CMTF.FreeF f CmdName x -> x
 randParserAlg (CMTF.Pure cmd) = Left $ mkCommand cmd
 randParserAlg (CMTF.Free ps)  = 
     Right 
