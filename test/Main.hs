@@ -9,6 +9,7 @@ import Options.Applicative
 import Options.Repline
 import Test.QuickCheck
 import Test.Tasty
+import Data.Coerce
 import qualified Test.Tasty.QuickCheck as QC
 
 main = defaultMain tests
@@ -17,7 +18,7 @@ tests :: TestTree
 tests = testGroup "Properties" [qcProperties]
 
 qcProperties :: TestTree
-qcProperties = testGroup "QuickCheck" 
+qcProperties = localOption (QC.QuickCheckMaxSize 10) $ testGroup "QuickCheck" 
   [ collectCmdNamesTest
   , runParserTest
   ]
@@ -30,11 +31,17 @@ runParserTest = QC.testProperty "runParser gives back correct cmd" runParserProp
 
 -- Tests that collecting all the toplevel command names works 
 collectCmdNamesProp :: Property
-collectCmdNamesProp = forAll (liftArbitrary arbitraryCmdName) $ \ptree ->
-    let collectedNames = sort $ collectTopLevelCmdNames $ fromParserTree @ParserTree ptree 
+collectCmdNamesProp = property $ \ptree' ->
+    let 
+        ptree :: ParserTree CmdName
+        ptree = fmap (coerce @CmdName' @CmdName) ptree'
+
+        collectedNames = sort $ collectTopLevelCmdNames $ fromParserTree ptree 
         cmdNames = sort $ getCmdNames ptree
     in 
       counterexample ("Collected names: " <> (show collectedNames))
+    $ classify (cmdNames == []) ("cmdName == []")
+    $ classify (length cmdNames > 2) ("cmdNames =" <> (show cmdNames))
     $ collectedNames == cmdNames
 
 -- Tests that calling the toplevel parser with one of the
@@ -42,11 +49,14 @@ collectCmdNamesProp = forAll (liftArbitrary arbitraryCmdName) $ \ptree ->
 -- the optparse-applicative parser will work with the repline parser after we've appended
 -- the command name to the list of arguments.
 runParserProp  :: Property
-runParserProp = forAll (liftArbitrary arbitraryCmdName >>= withSelected) $ \(ptree, selectedCmdName) ->
+runParserProp = property $ \ptree' ->
   let 
-    parsedCmd = 
-      selectedCmdName 
-      >>= runParser (testOptParser . fromParserTree @ParserTree $ ptree) . pure
-  in 
-    counterexample ("Parser returned: " <> (show parsedCmd))
-  $ parsedCmd == selectedCmdName
+    ptree :: ParserTree CmdName
+    ptree = fmap (coerce @CmdName' @CmdName) ptree'
+    (parser, pickName) = fromParserTreeSelName ptree
+  in forAll pickName $ \selectedCmdName ->
+    let
+      parsedCmd = selectedCmdName >>= runParser (testOptParser parser) . pure
+    in 
+      counterexample ("Parser returned: " <> (show parsedCmd))
+    $ parsedCmd == selectedCmdName

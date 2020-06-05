@@ -40,5 +40,8 @@ test-suite optparse-repline-test
     , tasty-quickcheck
     , optparse-applicative
     , repline
+    , recursion-schemes
+    , free
+    , newtype
   hs-source-dirs: test
   default-language:    Haskell2010

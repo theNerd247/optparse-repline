@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Arbitrary.Repline where
 
@@ -26,6 +27,16 @@ type Cmd a = Mod CommandFields a
 
 type ParserTree = Free []
 
+newtype CmdName' = CmdName' { unCmdName :: CmdName }
+  deriving (Show)
+
+instance Arbitrary CmdName' where
+  arbitrary = coerce <$> arbitraryCmdName
+  shrink    = coerce . (shrink @CmdName) . coerce
+
+arbitraryCmdName :: Gen CmdName
+arbitraryCmdName = resize 7 $ listOf $ arbitrary `suchThat` isLetter
+
 instance (Arbitrary a, Arbitrary1 f) => Arbitrary (Free f a) where
   arbitrary = liftArbitrary arbitrary
   shrink    = liftShrink shrink
@@ -43,10 +54,10 @@ fromParserTree = fromPTree . cata randParserAlg
 fromPTree :: Either (Cmd a) (Parser a) -> ParserInfo a
 fromPTree = emptyParser . either subparser id
 
--- fromParserTreeSelName :: (Functor f, Foldable f) => Free f CmdName -> (ParserInfo CmdName, Gen (Maybe CmdName))
--- fromParserTreeSelName = 
---   (fromPTree *** getMaybeChooseFirst)
---   . cata (cAlg randParserAlg maybeChooseFirst)
+fromParserTreeSelName :: (Functor f, Foldable f) => Free f CmdName -> (ParserInfo CmdName, Gen (Maybe CmdName))
+fromParserTreeSelName = 
+  (fromPTree *** id)
+  . cata (cAlg randParserAlg maybeChooseFirst)
 
 cAlg :: (Functor f) => (f a -> c) -> (f b -> d) -> f (a,b) -> (c,d)
 cAlg algA algB = (algA . fmap fst) &&& (algB . fmap snd)
@@ -76,9 +87,6 @@ testOptParser p = OptParser
 emptyParser :: Parser a -> ParserInfo a
 emptyParser = flip info mempty 
 
-arbitraryCmdName :: Gen CmdName
-arbitraryCmdName = resize 7 $ listOf $ arbitrary `suchThat` isLetter
-
 -- Creates a command parser that always succeeds and returns its name. This is
 -- used to determine if the correct internal parser is called when commandline
 -- args that corresponds to the created parser
@@ -101,13 +109,6 @@ instance (Functor f, Newtype a b) => Newtype (Af f a) (f b) where
   pack   = Af . fmap pack
   unpack = fmap unpack . unAf
 
--- instance (Functor f, Newtype a b) => Newtype (NTF f a) (f b) where
---   pack = NTF . fmap pack
--- 
---   unpack :: (Functor f, Newtype a b) => NTF f a -> f b
---   unpack = fmap unpack . unNTF
-
--- foldAlgMap :: (Coerce m b, Foldable f, Monoid m) => (a -> b) -> (b -> m) -> CMTF.FreeF f a b -> b
-
+foldAlgMap :: (Newtype m b, Foldable f, Monoid m) => (b -> m) -> (a -> b) -> CMTF.FreeF f a b -> b
 foldAlgMap _ f (CMTF.Pure x) = f x
 foldAlgMap g _ (CMTF.Free x) = ala g foldMap x
