@@ -34,6 +34,9 @@ instance (Arbitrary1 f) => Arbitrary1 (Free f) where
 fromParserTree :: (Functor f, Foldable f) => Free f CmdName -> ParserInfo CmdName
 fromParserTree = emptyParser . fromPVal . cata randParserAlg
 
+getCmdNames :: (Foldable f) => Free f CmdName -> [CmdName]
+getCmdNames = toList
+
 fromPVal :: PVal a -> Parser a
 fromPVal = either subparser id
 
