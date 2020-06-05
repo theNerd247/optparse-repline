@@ -31,15 +31,16 @@ instance (Arbitrary1 f) => Arbitrary1 (Free f) where
   liftShrink shrinkA (Pure a)  = Pure <$> (shrinkA a)
   liftShrink shrinkA (Free fFree) = Free <$> liftShrink (liftShrink shrinkA) fFree
 
--- fromParserTree :: (Foldable f) => Free f (Cmd a) -> m (Parser a)
--- fromParserTree = cata randParserAlg
+fromParserTree :: (Functor f, Foldable f) => Free f CmdName -> ParserInfo CmdName
+fromParserTree = emptyParser . fromPVal . cata randParserAlg
 
 fromPVal :: PVal a -> Parser a
 fromPVal = either subparser id
 
-randParserAlg :: (Foldable f) => CMTF.FreeF f (Cmd a) (PVal a) -> (PVal a)
-randParserAlg (CMTF.Pure cmd) = Left cmd
-randParserAlg (CMTF.Free ps)  = Right . uncurry (<|>) . (subparser *** getAlt) . foldMap (collectMonoid . right Alt) $ ps
+randParserAlg :: (Foldable f) => CMTF.FreeF f CmdName (PVal CmdName) -> (PVal CmdName)
+randParserAlg (CMTF.Pure cmd) = Left $ mkCommand cmd
+randParserAlg (CMTF.Free ps)  = 
+  Right . uncurry (<|>) . (subparser *** getAlt) . foldMap (collectMonoid . right Alt) $ ps
 
 collectMonoid :: (Monoid a, Monoid b) => Either a b -> (a, b)
 collectMonoid = either ((,mempty)) ((mempty,))
@@ -53,9 +54,6 @@ testOptParser p = OptParser
 
 emptyParser :: Parser a -> ParserInfo a
 emptyParser = flip info mempty 
-
-arbitraryCmd :: Gen (Cmd CmdName)
-arbitraryCmd = mkCommand <$> arbitraryCmdName
 
 arbitraryCmdName :: Gen CmdName
 arbitraryCmdName = resize 7 $ listOf $ arbitrary `suchThat` isLetter
