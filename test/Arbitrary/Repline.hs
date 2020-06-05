@@ -1,12 +1,15 @@
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Arbitrary.Repline where
 
+import Data.Coerce
+import Control.Newtype
 import Control.Arrow
 import Control.Monad.Free 
 import Data.Char (isLetter)
@@ -40,10 +43,10 @@ fromParserTree = fromPTree . cata randParserAlg
 fromPTree :: Either (Cmd a) (Parser a) -> ParserInfo a
 fromPTree = emptyParser . either subparser id
 
-fromParserTreeSelName :: (Functor f, Foldable f) => Free f CmdName -> (ParserInfo CmdName, Gen (Maybe CmdName))
-fromParserTreeSelName = 
-  (fromPTree *** getMaybeChooseFirst)
-  . cata (cAlg randParserAlg maybeChooseFirst)
+-- fromParserTreeSelName :: (Functor f, Foldable f) => Free f CmdName -> (ParserInfo CmdName, Gen (Maybe CmdName))
+-- fromParserTreeSelName = 
+--   (fromPTree *** getMaybeChooseFirst)
+--   . cata (cAlg randParserAlg maybeChooseFirst)
 
 cAlg :: (Functor f) => (f a -> c) -> (f b -> d) -> f (a,b) -> (c,d)
 cAlg algA algB = (algA . fmap fst) &&& (algB . fmap snd)
@@ -51,7 +54,7 @@ cAlg algA algB = (algA . fmap fst) &&& (algB . fmap snd)
 getCmdNames :: (Foldable f) => Free f CmdName -> [CmdName]
 getCmdNames = toList
 
-randParserAlg :: (x ~ Either (Cmd CmdName) (Parser CmdName), Foldable f) => CMTF.FreeF f CmdName x -> x
+randParserAlg :: (Foldable f) => CMTF.FreeF f CmdName (Either (Cmd CmdName) (Parser CmdName)) -> Either (Cmd CmdName) (Parser CmdName)
 randParserAlg (CMTF.Pure cmd) = Left $ mkCommand cmd
 randParserAlg (CMTF.Free ps)  = 
     Right 
@@ -82,9 +85,29 @@ arbitraryCmdName = resize 7 $ listOf $ arbitrary `suchThat` isLetter
 mkCommand :: CmdName -> Cmd CmdName
 mkCommand cmdName = command cmdName $ info (pure $ cmdName) mempty
 
-maybeChooseFirst :: (Foldable f, x ~ Ap Gen (First a)) => CMTF.FreeF f a x -> x
-maybeChooseFirst (CMTF.Pure x) = Ap $ elements [First Nothing, First $ Just x]
-maybeChooseFirst (CMTF.Free x) = foldMap id x
+maybeChooseFirst :: (Foldable f) => CMTF.FreeF f a (Gen (Maybe a)) -> Gen (Maybe a)
+maybeChooseFirst = foldAlgMap (Af . fmap First) (elements . (:mempty) . Just)
 
-getMaybeChooseFirst :: Ap Gen (First a) -> Gen (Maybe a)
-getMaybeChooseFirst = fmap getFirst . getAp
+newtype Af f a = Af { unAf :: f a }
+  deriving (Functor, Applicative)
+
+instance (Applicative f, Monoid m) => Semigroup (Af f m) where
+  x <> y = Af $ (<>) <$> (coerce x) <*> (coerce y)
+
+instance (Applicative f, Monoid m) => Monoid (Af f m) where
+  mempty = Af $ pure mempty
+
+instance (Functor f, Newtype a b) => Newtype (Af f a) (f b) where
+  pack   = Af . fmap pack
+  unpack = fmap unpack . unAf
+
+-- instance (Functor f, Newtype a b) => Newtype (NTF f a) (f b) where
+--   pack = NTF . fmap pack
+-- 
+--   unpack :: (Functor f, Newtype a b) => NTF f a -> f b
+--   unpack = fmap unpack . unNTF
+
+-- foldAlgMap :: (Coerce m b, Foldable f, Monoid m) => (a -> b) -> (b -> m) -> CMTF.FreeF f a b -> b
+
+foldAlgMap _ f (CMTF.Pure x) = f x
+foldAlgMap g _ (CMTF.Free x) = ala g foldMap x
