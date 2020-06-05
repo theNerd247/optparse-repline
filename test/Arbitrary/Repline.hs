@@ -43,7 +43,11 @@ fromPVal = either subparser id
 randParserAlg :: (Foldable f) => CMTF.FreeF f CmdName (PVal CmdName) -> (PVal CmdName)
 randParserAlg (CMTF.Pure cmd) = Left $ mkCommand cmd
 randParserAlg (CMTF.Free ps)  = 
-  Right . uncurry (<|>) . (subparser *** getAlt) . foldMap (collectMonoid . right Alt) $ ps
+    Right 
+  . uncurry (<|>) 
+  . (subparser *** getAlt) 
+  . foldMap (collectMonoid . right Alt) 
+  $ ps
 
 collectMonoid :: (Monoid a, Monoid b) => Either a b -> (a, b)
 collectMonoid = either ((,mempty)) ((mempty,))
