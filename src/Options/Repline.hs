@@ -22,10 +22,7 @@ data OptParser a = forall b. OptParser
   }
 
 toRepline :: OptParser a -> [(String, Args -> a)]
-toRepline p@OptParser{..} = 
-      sortOn fst
-  $  ("help", mkHelpParser p)
-  : (fmap (mkToplevelCmdParser p) . collectTopLevelCmdNames $ parserInfo)
+toRepline p@OptParser{..} = sortOn fst $ (fmap (mkToplevelCmdParser p) . collectTopLevelCmdNames $ parserInfo)
 
 collectTopLevelCmdNames :: ParserInfo a -> [CmdName]
 collectTopLevelCmdNames = mconcat . mapParser (const $ getTopLevelCmdNames . optMain) . infoParser
@@ -57,7 +54,7 @@ prependCmdName :: CmdName -> Args -> Args
 prependCmdName = (:)
 
 appendHelpFlag :: Args -> Args
-appendHelpFlag = (<> ["--help"])
+appendHelpFlag = (<> ["-h"])
 
 -- 
 -- (String, ....) --> for toplevel commands only, composable only between

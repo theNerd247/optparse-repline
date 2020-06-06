@@ -10,7 +10,7 @@ version:             0.1.0.0
 -- bug-reports:
 -- license:
 -- license-file:        LICENSE
-author:              theNerd247
+author:              Noah Harvey
 maintainer:          noah.harvey247 gm
 -- copyright:
 -- category:
@@ -26,8 +26,19 @@ library
     , repline
   hs-source-dirs: src/
 
+executable sample
+  main-is:  Main.hs
+  hs-source-dirs: example/
+  build-depends:
+    base
+    , optparse-repline
+    , repline
+    , optparse-applicative
+    , mtl
+
 test-suite optparse-repline-test
   type: exitcode-stdio-1.0
+  hs-source-dirs: test/
   main-is:  Main.hs
   other-modules:
     Arbitrary.Repline
@@ -43,5 +54,4 @@ test-suite optparse-repline-test
     , recursion-schemes
     , free
     , newtype
-  hs-source-dirs: test
   default-language:    Haskell2010

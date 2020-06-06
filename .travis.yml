@@ -1,0 +1,13 @@
+language: nix
+
+branches:
+  only:
+    - master
+
+# deploy:
+#   provider: pages:git
+#   edge: true
+#   local_dir: ./result
+#   target_branch: gh-pages
+#   # Set in the settings page of your repository, as a secure variable
+#   token: $GITHUB_TOKEN  
