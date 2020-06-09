@@ -5,40 +5,47 @@ import Options.Applicative
 import System.Console.Repline
 import Control.Monad.Trans (lift)
 
-type CmdM = HaskelineT IO
+type ReplCmdM = HaskelineT IO
 
-main = evalRepl (pure "> ") (const $ pure ()) options (Just ':') File (lift $ putStrLn "Hello...")
+data ReplCmd
+  = Echo String
+  | Quit
+  deriving (Show)
+
+main = evalRepl 
+  (pure "> ") 
+  (const $ pure ()) 
+  options 
+  (Just ':') 
+  File 
+  (lift $ putStrLn "Hello...")
 
 options = ("help", mkHelpParser optParser) : toRepline optParser
 
 optParser =
   OptParser 
-  { parserPrefs        = prefs $ showHelpOnError
+  { parserPrefs        = prefs showHelpOnError
   , parserInfo         = mainParser
   , handleParserResult = handleResult
   }
 
-handleResult :: ParserResult (CmdM ()) -> CmdM ()
-handleResult (Success m) = m
+handleResult :: ParserResult ReplCmd -> ReplCmdM ()
+handleResult (Success cmd) = handleReplCmd cmd
 handleResult (Failure x) = lift . putStrLn $ showFailure x
 
-mainParser :: ParserInfo (CmdM ())
-mainParser = info 
-  ( hsubparser $
-       echoCmd
-    <> quitCmd
-  ) fullDesc
+handleReplCmd :: ReplCmd -> ReplCmdM ()
+handleReplCmd Quit     = abort
+handleReplCmd (Echo s) = lift $ putStrLn s
 
-echoCmd :: Mod CommandFields (CmdM ())
-echoCmd = command "echo" $ 
-  info 
-    ( (lift . putStrLn) <$> strArgument (metavar "TEXT" <> help "text to echo")
-    ) 
-    fullDesc
+mainParser :: ParserInfo ReplCmd
+mainParser = info (helper <*> parser) fullDesc
+  where
+    parser = hsubparser $ echoReplCmd <> quitReplCmd
 
-quitCmd :: Mod CommandFields (CmdM ())
-quitCmd = command "quit" $ 
-  info 
-    ( pure abort
-    ) 
-  (fullDesc <> (header "Quit the REPL"))
+echoReplCmd :: Mod CommandFields ReplCmd
+echoReplCmd = command "echo" $ info parser fullDesc
+  where
+    parser = Echo . unwords <$> some (strArgument (metavar "TEXT" <> help "text to echo"))
+
+quitReplCmd :: Mod CommandFields ReplCmd
+quitReplCmd = command "quit" $ info (pure Quit) $ fullDesc <> header "Quit the REPL"

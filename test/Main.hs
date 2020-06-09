@@ -6,7 +6,7 @@ import Arbitrary.Repline
 import Data.Functor.Compose (Compose(..))
 import Data.List (sort)
 import Options.Applicative
-import Options.Repline
+import Options.Repline.Internal
 import Test.QuickCheck
 import Test.Tasty
 import Data.Coerce
@@ -40,8 +40,8 @@ collectCmdNamesProp = property $ \ptree' ->
         cmdNames = sort $ getCmdNames ptree
     in 
       counterexample ("Collected names: " <> (show collectedNames))
-    $ classify (cmdNames == []) ("cmdName == []")
-    $ classify (length cmdNames > 2) ("cmdNames =" <> (show cmdNames))
+--     $ classify (cmdNames == []) ("cmdName == []")
+--     $ classify (length cmdNames > 2) ("cmdNames =" <> (show cmdNames))
     $ collectedNames == cmdNames
 
 -- Tests that calling the toplevel parser with one of the

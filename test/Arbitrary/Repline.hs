@@ -19,12 +19,17 @@ import Data.Functor.Foldable
 import Data.Monoid (Alt(..), Ap(..), First(..))
 import Numeric.Natural
 import Options.Applicative
-import Options.Repline
+import Options.Repline.Internal
 import Test.QuickCheck
 import qualified Control.Monad.Trans.Free as CMTF
 
 type Cmd a = Mod CommandFields a
 
+-- We use our own tree structure to generate arbitrary parsers to make it
+-- easier to shrink arbitrarily generated parsers as well as making randomly
+-- picking a command name easier. From a ParserTree CmdName we can construct a
+-- OptParser a and cooresponding [CmdName] by folding over the tree with 2
+-- algebras running in parallel.
 type ParserTree = Free []
 
 newtype CmdName' = CmdName' { unCmdName :: CmdName }
