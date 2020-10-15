@@ -56,7 +56,7 @@ runParserProp = property $ \ptree' ->
     (parser, pickName) = fromParserTreeSelName ptree
   in forAll pickName $ \selectedCmdName ->
     let
-      parsedCmd = selectedCmdName >>= runParser (testOptParser parser) . pure
-    in 
+      parsedCmd = selectedCmdName >>= runParser (testOptParser parser)
+    in
       counterexample ("Parser returned: " <> (show parsedCmd))
     $ parsedCmd == selectedCmdName

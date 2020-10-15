@@ -4,7 +4,7 @@ cabal-version:       >=1.10
 -- http://haskell.org/cabal/users-guide/
 
 name:                optparse-repline
-version:             0.1.0.0
+version:             0.2.0.0
 -- synopsis:
 -- description:
 -- bug-reports:
@@ -19,7 +19,7 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:
-    Options.Repline  
+    Options.Repline
     Options.Repline.Internal
   build-depends:
       base
@@ -44,7 +44,7 @@ test-suite optparse-repline-test
   other-modules:
     Arbitrary.Repline
   -- other-extensions:
-  build-depends:       
+  build-depends:
       base
     , optparse-repline
     , QuickCheck

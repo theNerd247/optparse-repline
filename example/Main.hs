@@ -1,9 +1,13 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Main where
 
-import Options.Repline
-import Options.Applicative
-import System.Console.Repline
+import Control.Applicative
 import Control.Monad.Trans (lift)
+import qualified Options.Applicative as Options
+import Options.Repline
+import System.Console.Repline (CompleterStyle(..), ExitDecision(..), HaskelineT, ReplOpts(..), abort, evalReplOpts)
 
 type ReplCmdM = HaskelineT IO
 
@@ -12,40 +16,43 @@ data ReplCmd
   | Quit
   deriving (Show)
 
-main = evalRepl 
-  (pure "> ") 
-  (const $ pure ()) 
-  options 
-  (Just ':') 
-  File 
-  (lift $ putStrLn "Hello...")
-
-options = ("help", mkHelpParser optParser) : toRepline optParser
+main = evalReplOpts ReplOpts{..}
+  where
+    banner = const (pure "> ")
+    command = \input -> lift (putStrLn ("Got normal input: " <> input))
+    options :: [(String, String -> ReplCmdM ())] =
+      ("help", mkHelpParser optParser)
+      : toRepline optParser
+    prefix = Just ':'
+    multilineCommand = Nothing
+    tabComplete = File
+    initialiser = lift $ putStrLn "Hello...."
+    finaliser = pure Exit
 
 optParser =
-  OptParser 
-  { parserPrefs        = prefs showHelpOnError
+  OptParser
+  { parserPrefs        = Options.prefs Options.showHelpOnError
   , parserInfo         = mainParser
   , handleParserResult = handleResult
   }
 
-handleResult :: ParserResult ReplCmd -> ReplCmdM ()
-handleResult (Success cmd) = handleReplCmd cmd
-handleResult (Failure x) = lift . putStrLn $ showFailure x
+handleResult :: Options.ParserResult ReplCmd -> ReplCmdM ()
+handleResult (Options.Success cmd) = handleReplCmd cmd
+handleResult (Options.Failure x) = lift . putStrLn $ showFailure x
 
 handleReplCmd :: ReplCmd -> ReplCmdM ()
 handleReplCmd Quit     = abort
 handleReplCmd (Echo s) = lift $ putStrLn s
 
-mainParser :: ParserInfo ReplCmd
-mainParser = info (helper <*> parser) fullDesc
+mainParser :: Options.ParserInfo ReplCmd
+mainParser = Options.info (Options.helper <*> parser) Options.fullDesc
   where
-    parser = hsubparser $ echoReplCmd <> quitReplCmd
+    parser = Options.hsubparser $ echoReplCmd <> quitReplCmd
 
-echoReplCmd :: Mod CommandFields ReplCmd
-echoReplCmd = command "echo" $ info parser fullDesc
+echoReplCmd :: Options.Mod Options.CommandFields ReplCmd
+echoReplCmd = Options.command "echo" $ Options.info parser Options.fullDesc
   where
-    parser = Echo . unwords <$> some (strArgument (metavar "TEXT" <> help "text to echo"))
+    parser = Echo . unwords <$> some (Options.strArgument (Options.metavar "TEXT" <> Options.help "text to echo"))
 
-quitReplCmd :: Mod CommandFields ReplCmd
-quitReplCmd = command "quit" $ info (pure Quit) $ fullDesc <> header "Quit the REPL"
+quitReplCmd :: Options.Mod Options.CommandFields ReplCmd
+quitReplCmd = Options.command "quit" $ Options.info (pure Quit) $ Options.fullDesc <> Options.header "Quit the REPL"

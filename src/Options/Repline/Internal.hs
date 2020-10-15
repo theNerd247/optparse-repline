@@ -1,17 +1,20 @@
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ExistentialQuantification #-}
 
 module Options.Repline.Internal where
 
-import Options.Applicative
-import Options.Applicative.Types
+import Data.Maybe (fromMaybe, listToMaybe)
 import Data.List (sortOn)
+import Options.Applicative
 import Options.Applicative.Common (mapParser)
+import Options.Applicative.Types (OptReader(..), optMain)
 import qualified System.Console.Repline as REPL
 
+type Args = String
 type CmdName = String
 type Options a = [(String, Args -> a)]
 
@@ -41,17 +44,17 @@ mkHelpParser :: OptParser a -> Args -> a
 mkHelpParser pInfo = runParser pInfo . appendHelpFlag
 
 runParser :: OptParser a -> Args -> a
-runParser OptParser{..} = handleParserResult . execParserPure parserPrefs parserInfo 
+runParser OptParser{..} =
+  handleParserResult . execParserPure parserPrefs parserInfo . words
 
 commandNameFromArgs :: Args -> CmdName
-commandNameFromArgs []     = ""
-commandNameFromArgs (x:xs) = x
+commandNameFromArgs = fromMaybe "" . listToMaybe . words
 
 showFailure :: ParserFailure ParserHelp -> String
 showFailure = fst . flip renderFailure "" 
 
 prependCmdName :: CmdName -> Args -> Args
-prependCmdName = (:)
+prependCmdName cmdName s = cmdName <> " " <> s
 
 appendHelpFlag :: Args -> Args
-appendHelpFlag = (<> ["-h"])
+appendHelpFlag = (<> " -h")

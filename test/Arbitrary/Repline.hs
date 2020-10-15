@@ -40,7 +40,7 @@ instance Arbitrary CmdName' where
   shrink    = coerce . (shrink @CmdName) . coerce
 
 arbitraryCmdName :: Gen CmdName
-arbitraryCmdName = resize 7 $ listOf $ arbitrary `suchThat` isLetter
+arbitraryCmdName = resize 7 $ listOf1 (arbitrary `suchThat` isLetter)
 
 instance (Arbitrary a, Arbitrary1 f) => Arbitrary (Free f a) where
   arbitrary = liftArbitrary arbitrary
@@ -82,7 +82,7 @@ randParserAlg (CMTF.Free ps)  =
 eitherMonoid :: (Monoid a, Monoid b) => Either a b -> (a, b)
 eitherMonoid = ((,mempty)) ||| ((mempty,))
 
-testOptParser :: ParserInfo a ->  OptParser (Maybe a)
+testOptParser :: ParserInfo a -> OptParser (Maybe a)
 testOptParser p = OptParser
   { parserPrefs        = defaultPrefs
   , parserInfo         = p
